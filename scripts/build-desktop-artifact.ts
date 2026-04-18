@@ -45,6 +45,12 @@ interface PlatformConfig {
   readonly archChoices: ReadonlyArray<typeof BuildArch.Type>;
 }
 
+const DESKTOP_BUILD_AUTHOR = {
+  name: "T3 Tools",
+  email: "opensource@t3.tools",
+} as const;
+const DESKTOP_BUILD_HOMEPAGE = "https://github.com/pingdotgg/t3code";
+
 const PLATFORM_CONFIG: Record<typeof BuildPlatform.Type, PlatformConfig> = {
   mac: {
     cliFlag: "--mac",
@@ -208,6 +214,22 @@ interface ResolvedBuildOptions {
   readonly mockUpdateServerPort: number | undefined;
 }
 
+export function resolveBuildTargets(
+  platform: typeof BuildPlatform.Type,
+  target: string,
+): ReadonlyArray<string> {
+  const parsedTargets = target
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  if (parsedTargets.length > 0) {
+    return parsedTargets;
+  }
+
+  return [PLATFORM_CONFIG[platform].defaultTarget];
+}
+
 interface StagePackageJson {
   readonly name: string;
   readonly version: string;
@@ -215,7 +237,11 @@ interface StagePackageJson {
   readonly t3codeCommitHash: string;
   readonly private: true;
   readonly description: string;
-  readonly author: string;
+  readonly author: {
+    readonly name: string;
+    readonly email: string;
+  };
+  readonly homepage: string;
   readonly main: string;
   readonly build: Record<string, unknown>;
   readonly dependencies: Record<string, unknown>;
@@ -566,6 +592,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   mockUpdates: boolean,
   mockUpdateServerPort: number | undefined,
 ) {
+  const targets = resolveBuildTargets(platform, target);
   const buildConfig: Record<string, unknown> = {
     appId: "com.t3tools.t3code",
     productName: resolveDesktopProductName(version),
@@ -589,7 +616,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
 
   if (platform === "mac") {
     buildConfig.mac = {
-      target: target === "dmg" ? [target, "zip"] : [target],
+      target: targets.includes("dmg") ? [...targets, "zip"] : targets,
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
     };
@@ -597,10 +624,11 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
 
   if (platform === "linux") {
     buildConfig.linux = {
-      target: [target],
+      target: targets,
       executableName: "t3code",
       icon: "icon.png",
       category: "Development",
+      maintainer: `${DESKTOP_BUILD_AUTHOR.name} <${DESKTOP_BUILD_AUTHOR.email}>`,
       desktop: {
         entry: {
           StartupWMClass: "t3code",
@@ -612,7 +640,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "win") {
     buildConfig.npmRebuild = false;
     const winConfig: Record<string, unknown> = {
-      target: [target],
+      target: targets,
       icon: "icon.ico",
     };
     if (signed) {
@@ -784,7 +812,8 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     t3codeCommitHash: commitHash,
     private: true,
     description: "T3 Code desktop build",
-    author: "T3 Tools",
+    author: DESKTOP_BUILD_AUTHOR,
+    homepage: DESKTOP_BUILD_HOMEPAGE,
     main: "apps/desktop/dist-electron/main.cjs",
     build: yield* createBuildConfig(
       options.platform,
@@ -896,7 +925,7 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
   ),
   target: Flag.string("target").pipe(
     Flag.withDescription(
-      "Artifact target, for example dmg/AppImage/nsis (env: T3CODE_DESKTOP_TARGET).",
+      "Artifact target, for example dmg, AppImage, deb, nsis, or a comma-separated list such as AppImage,deb (env: T3CODE_DESKTOP_TARGET).",
     ),
     Flag.optional,
   ),

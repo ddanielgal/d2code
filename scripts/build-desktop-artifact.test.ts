@@ -4,6 +4,7 @@ import { ConfigProvider, Effect, Option } from "effect";
 
 import {
   resolveBuildOptions,
+  resolveBuildTargets,
   resolveDesktopBuildIconAssets,
   resolveDesktopProductName,
   resolveDesktopUpdateChannel,
@@ -35,6 +36,11 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       linuxIconPng: BRAND_ASSET_PATHS.nightlyLinuxIconPng,
       windowsIconIco: BRAND_ASSET_PATHS.nightlyWindowsIconIco,
     });
+  });
+
+  it("supports comma-separated linux artifact targets", () => {
+    assert.deepStrictEqual(resolveBuildTargets("linux", "AppImage, deb"), ["AppImage", "deb"]);
+    assert.deepStrictEqual(resolveBuildTargets("linux", "   "), ["AppImage"]);
   });
 
   it("falls back to the default mock update port when the configured port is blank", () => {

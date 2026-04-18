@@ -33,11 +33,21 @@ winget install T3Tools.T3Code
 brew install --cask t3-code
 ```
 
+#### Ubuntu / Kubuntu / Debian
+
+Download the `.deb` from [GitHub Releases](https://github.com/pingdotgg/t3code/releases) and install it with:
+
+```bash
+sudo apt install ./T3-Code-*.deb
+```
+
 #### Arch Linux (AUR)
 
 ```bash
 yay -S t3code-bin
 ```
+
+Linux auto-updates currently require the AppImage build. The `.deb` is the simplest native install path for Ubuntu-family desktops.
 
 ## Some notes
 
