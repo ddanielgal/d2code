@@ -2,6 +2,8 @@ import { scopeProjectRef } from "@t3tools/client-runtime";
 import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vitest";
 import {
+  applyThreadWorkspaceModeFromContext,
+  canApplyThreadWorkspaceModeFromContext,
   resolveThreadActionProjectRef,
   startNewLocalThreadFromContext,
   startNewThreadFromContext,
@@ -28,6 +30,7 @@ describe("chatThreadActions", () => {
     const projectRef = resolveThreadActionProjectRef(
       createContext({
         activeDraftThread: {
+          threadId: "thread-1" as never,
           environmentId: ENVIRONMENT_ID,
           projectId: PROJECT_ID,
           branch: "feature/refactor",
@@ -56,6 +59,7 @@ describe("chatThreadActions", () => {
     const didStart = await startNewThreadFromContext(
       createContext({
         activeDraftThread: {
+          threadId: "thread-1" as never,
           environmentId: ENVIRONMENT_ID,
           projectId: PROJECT_ID,
           branch: "feature/refactor",
@@ -103,5 +107,105 @@ describe("chatThreadActions", () => {
 
     expect(didStart).toBe(false);
     expect(handleNewThread).not.toHaveBeenCalled();
+  });
+
+  it("applies workspace mode changes to draft threads", () => {
+    const setDraftThreadContext = vi.fn();
+
+    const didApply = applyThreadWorkspaceModeFromContext({
+      activeThread: undefined,
+      activeDraftThread: {
+        threadId: "thread-1" as never,
+        environmentId: ENVIRONMENT_ID,
+        projectId: PROJECT_ID,
+        branch: "feature/refactor",
+        worktreePath: "/tmp/worktree",
+        envMode: "worktree",
+      },
+      nextEnvMode: "local",
+      setDraftThreadContext,
+    });
+
+    expect(didApply).toBe(true);
+    expect(setDraftThreadContext).toHaveBeenCalledWith(
+      {
+        environmentId: ENVIRONMENT_ID,
+        threadId: expect.any(String),
+      },
+      {
+        envMode: "local",
+      },
+    );
+  });
+
+  it("clears a draft worktree path when switching back to new-worktree mode", () => {
+    const setDraftThreadContext = vi.fn();
+
+    applyThreadWorkspaceModeFromContext({
+      activeThread: undefined,
+      activeDraftThread: {
+        threadId: "thread-1" as never,
+        environmentId: ENVIRONMENT_ID,
+        projectId: PROJECT_ID,
+        branch: "feature/refactor",
+        worktreePath: "/tmp/worktree",
+        envMode: "local",
+      },
+      nextEnvMode: "worktree",
+      setDraftThreadContext,
+    });
+
+    expect(setDraftThreadContext).toHaveBeenCalledWith(
+      {
+        environmentId: ENVIRONMENT_ID,
+        threadId: expect.any(String),
+      },
+      {
+        envMode: "worktree",
+        worktreePath: null,
+      },
+    );
+  });
+
+  it("allows empty server-thread routes with a backing draft session to change workspace mode", () => {
+    expect(
+      canApplyThreadWorkspaceModeFromContext({
+        activeThread: {
+          threadId: "thread-1" as never,
+          messages: [],
+          session: null,
+          worktreePath: null,
+        },
+        activeDraftThread: {
+          threadId: "thread-1" as never,
+          environmentId: ENVIRONMENT_ID,
+          projectId: PROJECT_ID,
+          branch: null,
+          worktreePath: null,
+          envMode: "local",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("does not allow workspace mode changes once a server thread has started", () => {
+    expect(
+      canApplyThreadWorkspaceModeFromContext({
+        activeThread: {
+          threadId: "thread-1" as never,
+          messages: [{}],
+          session: { status: "running" },
+          worktreePath: null,
+        },
+        activeDraftThread: {
+          threadId: "thread-1" as never,
+          environmentId: ENVIRONMENT_ID,
+          projectId: PROJECT_ID,
+          branch: null,
+          worktreePath: null,
+          envMode: "local",
+        },
+      }),
+    ).toBe(false);
   });
 });

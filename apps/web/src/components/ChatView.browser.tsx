@@ -4168,6 +4168,126 @@ describe("ChatView timeline estimator parity (full app)", () => {
     }
   });
 
+  it("switches thread workspace mode from the command palette on empty server threads", async () => {
+    const snapshot = addThreadToSnapshot(createDraftOnlySnapshot(), THREAD_ID);
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: {
+        ...snapshot,
+        threads: snapshot.threads.map((thread) =>
+          thread.id === THREAD_ID ? Object.assign({}, thread, { session: null }) : thread,
+        ),
+      },
+      configureFixture: (nextFixture) => {
+        nextFixture.serverConfig = {
+          ...nextFixture.serverConfig,
+          keybindings: [
+            {
+              command: "commandPalette.toggle",
+              shortcut: {
+                key: "k",
+                metaKey: false,
+                ctrlKey: false,
+                shiftKey: false,
+                altKey: false,
+                modKey: true,
+              },
+              whenAst: {
+                type: "not",
+                node: { type: "identifier", name: "terminalFocus" },
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    try {
+      await waitForServerConfigToApply();
+      await waitForCommandPaletteShortcutLabel();
+      const palette = page.getByTestId("command-palette");
+
+      await openCommandPaletteFromTrigger();
+      await page.getByPlaceholder("Search commands, projects, and threads...").fill("workspace");
+      await expect
+        .element(palette.getByText("Thread workspace", { exact: true }))
+        .toBeInTheDocument();
+      await palette.getByText("Thread workspace", { exact: true }).click();
+      await expect.element(palette.getByText("New worktree", { exact: true })).toBeInTheDocument();
+      await palette.getByText("New worktree", { exact: true }).click();
+
+      await vi.waitFor(
+        () => {
+          expect(findButtonByText("New worktree")).toBeTruthy();
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      await openCommandPaletteFromTrigger();
+      await page.getByPlaceholder("Search commands, projects, and threads...").fill("workspace");
+      await palette.getByText("Thread workspace", { exact: true }).click();
+      await expect
+        .element(palette.getByText("Current checkout", { exact: true }))
+        .toBeInTheDocument();
+      await palette.getByText("Current checkout", { exact: true }).click();
+
+      await vi.waitFor(
+        () => {
+          expect(findButtonByText("Current checkout")).toBeTruthy();
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("hides the thread workspace command when the current thread is locked", async () => {
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-command-palette-workspace-hidden" as MessageId,
+        targetText: "command palette workspace hidden",
+      }),
+      configureFixture: (nextFixture) => {
+        nextFixture.serverConfig = {
+          ...nextFixture.serverConfig,
+          keybindings: [
+            {
+              command: "commandPalette.toggle",
+              shortcut: {
+                key: "k",
+                metaKey: false,
+                ctrlKey: false,
+                shiftKey: false,
+                altKey: false,
+                modKey: true,
+              },
+              whenAst: {
+                type: "not",
+                node: { type: "identifier", name: "terminalFocus" },
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    try {
+      await waitForServerConfigToApply();
+      await waitForCommandPaletteShortcutLabel();
+      const palette = page.getByTestId("command-palette");
+
+      await openCommandPaletteFromTrigger();
+      await page.getByPlaceholder("Search commands, projects, and threads...").fill("workspace");
+      await expect
+        .element(palette.getByText("Thread workspace", { exact: true }))
+        .not.toBeInTheDocument();
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
   it("adds a project from browse mode with Enter when no directory is highlighted", async () => {
     const mounted = await mountChatView({
       viewport: DEFAULT_VIEWPORT,

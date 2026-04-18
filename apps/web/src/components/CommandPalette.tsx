@@ -15,6 +15,8 @@ import {
   ArrowUpIcon,
   CornerLeftUpIcon,
   FolderIcon,
+  FolderGit2Icon,
+  FolderGitIcon,
   FolderPlusIcon,
   MessageSquareIcon,
   SettingsIcon,
@@ -42,6 +44,8 @@ import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useSettings } from "../hooks/useSettings";
 import { readLocalApi } from "../localApi";
 import {
+  applyThreadWorkspaceModeFromContext,
+  canApplyThreadWorkspaceModeFromContext,
   startNewThreadInProjectFromContext,
   startNewThreadFromContext,
 } from "../lib/chatThreadActions";
@@ -86,7 +90,12 @@ import {
   ITEM_ICON_CLASS,
   RECENT_THREAD_LIMIT,
 } from "./CommandPalette.logic";
-import { resolveEnvironmentOptionLabel } from "./BranchToolbar.logic";
+import {
+  canChangeThreadWorkspaceMode,
+  resolveCurrentWorkspaceLabel,
+  resolveEnvironmentOptionLabel,
+  resolveEnvModeLabel,
+} from "./BranchToolbar.logic";
 import { CommandPaletteResults } from "./CommandPaletteResults";
 import { ProjectFavicon } from "./ProjectFavicon";
 import { ThreadRowLeadingStatus, ThreadRowTrailingStatus } from "./ThreadStatusIndicators";
@@ -105,6 +114,7 @@ import { Kbd, KbdGroup } from "./ui/kbd";
 import { toastManager } from "./ui/toast";
 import { ComposerHandleContext, useComposerHandleContext } from "../composerHandleContext";
 import type { ChatComposerHandle } from "./chat/ChatComposer";
+import { useComposerDraftStore } from "../composerDraftStore";
 
 const EMPTY_BROWSE_ENTRIES: FilesystemBrowseResult["entries"] = [];
 const BROWSE_STALE_TIME_MS = 30_000;
@@ -216,6 +226,7 @@ function OpenCommandPaletteDialog() {
   const settings = useSettings();
   const { activeDraftThread, activeThread, defaultProjectRef, handleNewThread } =
     useHandleNewThread();
+  const setDraftThreadContext = useComposerDraftStore((store) => store.setDraftThreadContext);
   const projects = useStore(useShallow(selectProjectsAcrossEnvironments));
   const threads = useStore(useShallow(selectSidebarThreadsAcrossEnvironments));
   const keybindings = useServerKeybindings();
@@ -323,6 +334,26 @@ function OpenCommandPaletteDialog() {
   );
 
   const activeThreadId = activeThread?.id;
+  const activeWorktreePath = activeThread?.worktreePath ?? activeDraftThread?.worktreePath ?? null;
+  const envLocked = Boolean(
+    activeThread &&
+    (activeThread.messages.length > 0 ||
+      (activeThread.session !== null && activeThread.session.status !== "closed")),
+  );
+  const canChangeWorkspaceMode = canChangeThreadWorkspaceMode({
+    hasServerThread: activeThread !== undefined,
+    activeWorktreePath,
+    envLocked,
+  });
+  const canApplyWorkspaceMode = canApplyThreadWorkspaceModeFromContext({
+    activeThread,
+    activeDraftThread,
+  });
+  const workspaceMode = canApplyWorkspaceMode
+    ? (activeDraftThread?.envMode ?? "local")
+    : activeWorktreePath
+      ? "worktree"
+      : "local";
   const currentProjectEnvironmentId =
     activeThread?.environmentId ?? activeDraftThread?.environmentId ?? null;
   const currentProjectId = activeThread?.projectId ?? activeDraftThread?.projectId ?? null;
@@ -669,6 +700,68 @@ function OpenCommandPaletteDialog() {
       addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
       groups: [{ value: "projects", label: "Projects", items: projectThreadItems }],
     });
+
+    if (currentProjectId && canChangeWorkspaceMode && canApplyWorkspaceMode) {
+      actionItems.push({
+        kind: "submenu",
+        value: "action:thread-workspace",
+        searchTerms: ["workspace", "checkout", "worktree", "environment", "thread workspace"],
+        title: "Thread workspace",
+        icon:
+          workspaceMode === "worktree" ? (
+            <FolderGit2Icon className={ITEM_ICON_CLASS} />
+          ) : activeWorktreePath ? (
+            <FolderGitIcon className={ITEM_ICON_CLASS} />
+          ) : (
+            <FolderIcon className={ITEM_ICON_CLASS} />
+          ),
+        addonIcon: <FolderGit2Icon className={ADDON_ICON_CLASS} />,
+        groups: [
+          {
+            value: "thread-workspace",
+            label: "Workspace",
+            items: [
+              {
+                kind: "action",
+                value: "action:thread-workspace:local",
+                searchTerms: ["current checkout", "local", "checkout", "workspace"],
+                title: resolveCurrentWorkspaceLabel(activeWorktreePath),
+                ...(workspaceMode === "local" ? { description: "Current" } : {}),
+                icon: activeWorktreePath ? (
+                  <FolderGitIcon className={ITEM_ICON_CLASS} />
+                ) : (
+                  <FolderIcon className={ITEM_ICON_CLASS} />
+                ),
+                run: async () => {
+                  applyThreadWorkspaceModeFromContext({
+                    activeThread,
+                    activeDraftThread,
+                    nextEnvMode: "local",
+                    setDraftThreadContext,
+                  });
+                },
+              },
+              {
+                kind: "action",
+                value: "action:thread-workspace:worktree",
+                searchTerms: ["new worktree", "worktree", "workspace"],
+                title: resolveEnvModeLabel("worktree"),
+                ...(workspaceMode === "worktree" ? { description: "Current" } : {}),
+                icon: <FolderGit2Icon className={ITEM_ICON_CLASS} />,
+                run: async () => {
+                  applyThreadWorkspaceModeFromContext({
+                    activeThread,
+                    activeDraftThread,
+                    nextEnvMode: "worktree",
+                    setDraftThreadContext,
+                  });
+                },
+              },
+            ],
+          },
+        ],
+      });
+    }
   }
 
   if (addProjectEnvironmentOptions.length > 1) {

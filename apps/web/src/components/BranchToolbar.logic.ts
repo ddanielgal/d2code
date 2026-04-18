@@ -69,6 +69,15 @@ export function resolveEffectiveEnvMode(input: {
   return activeWorktreePath ? "worktree" : "local";
 }
 
+export function canChangeThreadWorkspaceMode(input: {
+  hasServerThread: boolean;
+  activeWorktreePath: string | null;
+  envLocked: boolean;
+}): boolean {
+  const { hasServerThread, activeWorktreePath, envLocked } = input;
+  return !envLocked && (!hasServerThread || activeWorktreePath === null);
+}
+
 export function resolveDraftEnvModeAfterBranchChange(input: {
   nextWorktreePath: string | null;
   currentWorktreePath: string | null;

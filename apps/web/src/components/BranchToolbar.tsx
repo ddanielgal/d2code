@@ -6,6 +6,7 @@ import { useComposerDraftStore, type DraftId } from "../composerDraftStore";
 import { useStore } from "../store";
 import { createProjectSelectorByRef, createThreadSelectorByRef } from "../storeSelectors";
 import {
+  canChangeThreadWorkspaceMode,
   type EnvMode,
   type EnvironmentOption,
   resolveEffectiveEnvMode,
@@ -72,7 +73,11 @@ export const BranchToolbar = memo(function BranchToolbar({
       hasServerThread: serverThread !== undefined,
       draftThreadEnvMode: draftThread?.envMode,
     });
-  const envModeLocked = envLocked || (serverThread !== undefined && activeWorktreePath !== null);
+  const envModeLocked = !canChangeThreadWorkspaceMode({
+    hasServerThread: serverThread !== undefined,
+    activeWorktreePath,
+    envLocked,
+  });
 
   const showEnvironmentPicker =
     availableEnvironments && availableEnvironments.length > 1 && onEnvironmentChange;
