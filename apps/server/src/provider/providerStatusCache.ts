@@ -13,6 +13,9 @@ const decodeProviderStatusCache = Schema.decodeUnknownEffect(
   Schema.fromJsonString(ServerProviderSchema),
 );
 
+const makeAtomicWriteTempPath = (targetPath: string) =>
+  `${targetPath}.${process.pid}.${Date.now()}.${crypto.randomUUID()}.tmp`;
+
 const providerOrderRank = (provider: ServerProvider["provider"]): number => {
   const rank = PROVIDER_CACHE_IDS.indexOf(provider);
   return rank === -1 ? Number.MAX_SAFE_INTEGER : rank;
@@ -97,7 +100,7 @@ export const writeProviderStatusCache = (input: {
   readonly filePath: string;
   readonly provider: ServerProvider;
 }) => {
-  const tempPath = `${input.filePath}.${process.pid}.${Date.now()}.tmp`;
+  const tempPath = makeAtomicWriteTempPath(input.filePath);
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
