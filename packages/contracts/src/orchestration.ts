@@ -672,6 +672,22 @@ const ThreadMessageAssistantDeltaCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
+/**
+ * Replaces the streaming text of an assistant message with an authoritative
+ * full-text snapshot. Issued when the upstream provider revises previously
+ * streamed content (e.g. fixes a malformed code fence). Receivers MUST set
+ * the message text to `text` verbatim rather than appending.
+ */
+const ThreadMessageAssistantReplaceCommand = Schema.Struct({
+  type: Schema.Literal("thread.message.assistant.replace"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  messageId: MessageId,
+  text: Schema.String,
+  turnId: Schema.optional(TurnId),
+  createdAt: IsoDateTime,
+});
+
 const ThreadMessageAssistantCompleteCommand = Schema.Struct({
   type: Schema.Literal("thread.message.assistant.complete"),
   commandId: CommandId,
@@ -722,6 +738,7 @@ const ThreadRevertCompleteCommand = Schema.Struct({
 const InternalOrchestrationCommand = Schema.Union([
   ThreadSessionSetCommand,
   ThreadMessageAssistantDeltaCommand,
+  ThreadMessageAssistantReplaceCommand,
   ThreadMessageAssistantCompleteCommand,
   ThreadProposedPlanUpsertCommand,
   ThreadTurnDiffCompleteCommand,
@@ -748,6 +765,7 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.runtime-mode-set",
   "thread.interaction-mode-set",
   "thread.message-sent",
+  "thread.message-replaced",
   "thread.turn-start-requested",
   "thread.turn-interrupt-requested",
   "thread.approval-response-requested",
@@ -855,6 +873,21 @@ export const ThreadMessageSentPayload = Schema.Struct({
   turnId: Schema.NullOr(TurnId),
   streaming: Schema.Boolean,
   createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+
+/**
+ * Authoritative full-text replacement for a streaming assistant message.
+ * Emitted in response to a `thread.message.assistant.replace` command when an
+ * upstream provider revises previously streamed text. Reducers MUST replace
+ * the existing message text with `text` verbatim and preserve `streaming: true`
+ * so subsequent deltas continue to append.
+ */
+export const ThreadMessageReplacedPayload = Schema.Struct({
+  threadId: ThreadId,
+  messageId: MessageId,
+  text: Schema.String,
+  turnId: Schema.NullOr(TurnId),
   updatedAt: IsoDateTime,
 });
 
@@ -1009,6 +1042,11 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.message-sent"),
     payload: ThreadMessageSentPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.message-replaced"),
+    payload: ThreadMessageReplacedPayload,
   }),
   Schema.Struct({
     ...EventBaseFields,

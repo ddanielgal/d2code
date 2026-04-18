@@ -238,14 +238,6 @@ function textFromPart(part: Part): string | undefined {
   }
 }
 
-function commonPrefixLength(left: string, right: string): number {
-  let index = 0;
-  while (index < left.length && index < right.length && left[index] === right[index]) {
-    index += 1;
-  }
-  return index;
-}
-
 function suffixPrefixOverlap(text: string, delta: string): number {
   const maxLength = Math.min(text.length, delta.length);
   for (let length = maxLength; length > 0; length -= 1) {
@@ -263,18 +255,41 @@ function resolveLatestAssistantText(previousText: string | undefined, nextText: 
   return nextText;
 }
 
+export type MergeOpenCodeAssistantTextResult =
+  | {
+      readonly kind: "noop";
+      readonly latestText: string;
+    }
+  | {
+      readonly kind: "append";
+      readonly latestText: string;
+      readonly deltaToEmit: string;
+    }
+  | {
+      readonly kind: "replace";
+      readonly latestText: string;
+    };
+
 export function mergeOpenCodeAssistantText(
   previousText: string | undefined,
   nextText: string,
-): {
-  readonly latestText: string;
-  readonly deltaToEmit: string;
-} {
+): MergeOpenCodeAssistantTextResult {
   const latestText = resolveLatestAssistantText(previousText, nextText);
-  return {
-    latestText,
-    deltaToEmit: latestText.slice(commonPrefixLength(previousText ?? "", latestText)),
-  };
+  const previous = previousText ?? "";
+  if (latestText === previous) {
+    return { kind: "noop", latestText };
+  }
+  if (latestText.startsWith(previous)) {
+    return {
+      kind: "append",
+      latestText,
+      deltaToEmit: latestText.slice(previous.length),
+    };
+  }
+  // Divergence: the upstream provider revised text we already emitted.
+  // Caller MUST emit a `content.replace` event so the receiver replaces the
+  // accumulated text with `latestText` verbatim instead of appending a suffix.
+  return { kind: "replace", latestText };
 }
 
 export function appendOpenCodeAssistantTextDelta(
@@ -446,7 +461,7 @@ export function makeOpenCodeAdapterLive(_options?: OpenCodeAdapterLiveOptions) {
         }).catch(() => undefined);
       };
 
-      /** Emit content.delta and item.completed events for an assistant text part. */
+      /** Emit content.delta or content.replace + item.completed for an assistant text part. */
       const emitAssistantTextDelta = async (
         context: OpenCodeSessionContext,
         part: Part,
@@ -458,7 +473,8 @@ export function makeOpenCodeAdapterLive(_options?: OpenCodeAdapterLiveOptions) {
           return;
         }
         const previousText = context.emittedTextByPartId.get(part.id);
-        const { latestText, deltaToEmit } = mergeOpenCodeAssistantText(previousText, text);
+        const merge = mergeOpenCodeAssistantText(previousText, text);
+        const latestText = merge.latestText;
         context.emittedTextByPartId.set(part.id, latestText);
         if (latestText !== text) {
           context.partById.set(
@@ -468,7 +484,7 @@ export function makeOpenCodeAdapterLive(_options?: OpenCodeAdapterLiveOptions) {
               : part) satisfies Part,
           );
         }
-        if (deltaToEmit.length > 0) {
+        if (merge.kind === "append" && merge.deltaToEmit.length > 0) {
           await emitPromise({
             ...buildEventBase({
               threadId: context.session.threadId,
@@ -483,7 +499,25 @@ export function makeOpenCodeAdapterLive(_options?: OpenCodeAdapterLiveOptions) {
             type: "content.delta",
             payload: {
               streamKind: resolveTextStreamKind(part),
-              delta: deltaToEmit,
+              delta: merge.deltaToEmit,
+            },
+          });
+        } else if (merge.kind === "replace") {
+          await emitPromise({
+            ...buildEventBase({
+              threadId: context.session.threadId,
+              turnId,
+              itemId: part.id,
+              createdAt:
+                part.type === "text" || part.type === "reasoning"
+                  ? isoFromEpochMs(part.time?.start)
+                  : undefined,
+              raw,
+            }),
+            type: "content.replace",
+            payload: {
+              streamKind: resolveTextStreamKind(part),
+              text: latestText,
             },
           });
         }

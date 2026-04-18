@@ -313,11 +313,25 @@ it.layer(OpenCodeAdapterTestLayer)("OpenCodeAdapterLive", (it) => {
       const overlapDelta = appendOpenCodeAssistantTextDelta(firstUpdate.latestText, "lo world");
       const secondUpdate = mergeOpenCodeAssistantText(overlapDelta.nextText, "Hello world!");
 
+      assert.equal(firstUpdate.kind, "append");
+      assert.equal(secondUpdate.kind, "append");
+      const firstDelta = firstUpdate.kind === "append" ? firstUpdate.deltaToEmit : "";
+      const secondDelta = secondUpdate.kind === "append" ? secondUpdate.deltaToEmit : "";
       assert.deepEqual(
-        [firstUpdate.deltaToEmit, overlapDelta.deltaToEmit, secondUpdate.deltaToEmit],
+        [firstDelta, overlapDelta.deltaToEmit, secondDelta],
         ["Hello", " world", "!"],
       );
       assert.equal(secondUpdate.latestText, "Hello world!");
+    }),
+  );
+
+  it.effect("returns kind=replace when upstream revises previously emitted text", () =>
+    Effect.sync(() => {
+      const initial = mergeOpenCodeAssistantText(undefined, "Hello\n```py\nbug");
+      assert.equal(initial.kind, "append");
+      const repair = mergeOpenCodeAssistantText(initial.latestText, "Hello\n```python\nfixed");
+      assert.equal(repair.kind, "replace");
+      assert.equal(repair.latestText, "Hello\n```python\nfixed");
     }),
   );
 

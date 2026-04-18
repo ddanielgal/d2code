@@ -169,6 +169,7 @@ const ProviderRuntimeEventType = Schema.Literals([
   "item.updated",
   "item.completed",
   "content.delta",
+  "content.replace",
   "request.opened",
   "request.resolved",
   "user-input.requested",
@@ -219,6 +220,7 @@ const ItemStartedType = Schema.Literal("item.started");
 const ItemUpdatedType = Schema.Literal("item.updated");
 const ItemCompletedType = Schema.Literal("item.completed");
 const ContentDeltaType = Schema.Literal("content.delta");
+const ContentReplaceType = Schema.Literal("content.replace");
 const RequestOpenedType = Schema.Literal("request.opened");
 const RequestResolvedType = Schema.Literal("request.resolved");
 const UserInputRequestedType = Schema.Literal("user-input.requested");
@@ -411,6 +413,21 @@ const ContentDeltaPayload = Schema.Struct({
   summaryIndex: Schema.optional(Schema.Int),
 });
 export type ContentDeltaPayload = typeof ContentDeltaPayload.Type;
+
+/**
+ * Carries the authoritative full text for a streaming content part. Emitted
+ * when an upstream provider revises previously streamed text (e.g. the model
+ * "repairs" a malformed code fence). Consumers MUST replace any accumulated
+ * text for `(streamKind, contentIndex|summaryIndex)` with `text` verbatim
+ * rather than appending it.
+ */
+const ContentReplacePayload = Schema.Struct({
+  streamKind: RuntimeContentStreamKind,
+  text: Schema.String,
+  contentIndex: Schema.optional(Schema.Int),
+  summaryIndex: Schema.optional(Schema.Int),
+});
+export type ContentReplacePayload = typeof ContentReplacePayload.Type;
 
 const RequestOpenedPayload = Schema.Struct({
   requestType: CanonicalRequestType,
@@ -777,6 +794,13 @@ const ProviderRuntimeContentDeltaEvent = Schema.Struct({
 });
 export type ProviderRuntimeContentDeltaEvent = typeof ProviderRuntimeContentDeltaEvent.Type;
 
+const ProviderRuntimeContentReplaceEvent = Schema.Struct({
+  ...ProviderRuntimeEventBase.fields,
+  type: ContentReplaceType,
+  payload: ContentReplacePayload,
+});
+export type ProviderRuntimeContentReplaceEvent = typeof ProviderRuntimeContentReplaceEvent.Type;
+
 const ProviderRuntimeRequestOpenedEvent = Schema.Struct({
   ...ProviderRuntimeEventBase.fields,
   type: RequestOpenedType,
@@ -968,6 +992,7 @@ export const ProviderRuntimeEventV2 = Schema.Union([
   ProviderRuntimeItemUpdatedEvent,
   ProviderRuntimeItemCompletedEvent,
   ProviderRuntimeContentDeltaEvent,
+  ProviderRuntimeContentReplaceEvent,
   ProviderRuntimeRequestOpenedEvent,
   ProviderRuntimeRequestResolvedEvent,
   ProviderRuntimeUserInputRequestedEvent,

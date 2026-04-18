@@ -460,6 +460,22 @@ function coalesceOrchestrationUiEvents(
       continue;
     }
 
+    // Coalesce consecutive `thread.message-replaced` events for the same
+    // message: only the last replacement matters since each carries the
+    // complete authoritative text.
+    if (event.type === "thread.message-replaced") {
+      if (
+        previous?.type === "thread.message-replaced" &&
+        previous.payload.threadId === event.payload.threadId &&
+        previous.payload.messageId === event.payload.messageId
+      ) {
+        coalesced[coalesced.length - 1] = event;
+        continue;
+      }
+      coalesced.push(event);
+      continue;
+    }
+
     coalesced.push(event);
   }
 

@@ -1441,6 +1441,24 @@ function applyEnvironmentOrchestrationEvent(
         };
       });
 
+    case "thread.message-replaced":
+      return updateThreadState(state, event.payload.threadId, (thread) => {
+        const messages = thread.messages.map((entry) =>
+          entry.id !== event.payload.messageId
+            ? entry
+            : {
+                ...entry,
+                text: event.payload.text,
+                updatedAt: event.payload.updatedAt,
+              },
+        );
+        return {
+          ...thread,
+          messages,
+          updatedAt: event.occurredAt,
+        };
+      });
+
     case "thread.session-set":
       return updateThreadState(state, event.payload.threadId, (thread) => ({
         ...thread,
