@@ -1509,7 +1509,7 @@ export const ChatComposer = memo(
           return true;
         }
       }
-      if (key === "Enter" && !event.shiftKey) {
+      if (key === "Enter" && event.ctrlKey && !event.metaKey) {
         void onSend();
         return true;
       }

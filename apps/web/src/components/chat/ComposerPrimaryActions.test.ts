@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPendingPrimaryActionLabel } from "./ComposerPrimaryActions";
+import {
+  formatPendingPrimaryActionLabel,
+  formatSendPrimaryActionAriaLabel,
+} from "./ComposerPrimaryActions";
 
 describe("formatPendingPrimaryActionLabel", () => {
   it("returns 'Submitting...' while responding", () => {
@@ -89,5 +92,17 @@ describe("formatPendingPrimaryActionLabel", () => {
         questionIndex: 5,
       }),
     ).toBe("Submit answers");
+  });
+});
+
+describe("formatSendPrimaryActionAriaLabel", () => {
+  it("includes the Ctrl+Enter shortcut when the send action is available", () => {
+    expect(
+      formatSendPrimaryActionAriaLabel({
+        isConnecting: false,
+        isPreparingWorktree: false,
+        isSendBusy: false,
+      }),
+    ).toBe("Send message (Ctrl+Enter)");
   });
 });

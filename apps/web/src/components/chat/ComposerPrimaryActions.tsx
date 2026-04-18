@@ -1,8 +1,27 @@
 import { memo } from "react";
-import { ChevronDownIcon, ChevronLeftIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronLeftIcon, CornerDownLeftIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
+
+const SEND_SHORTCUT_LABEL = "Ctrl+Enter";
+
+export const formatSendPrimaryActionAriaLabel = (input: {
+  isConnecting: boolean;
+  isPreparingWorktree: boolean;
+  isSendBusy: boolean;
+}) => {
+  if (input.isConnecting) {
+    return "Connecting";
+  }
+  if (input.isPreparingWorktree) {
+    return "Preparing worktree";
+  }
+  if (input.isSendBusy) {
+    return "Sending";
+  }
+  return `Send message (${SEND_SHORTCUT_LABEL})`;
+};
 
 interface PendingActionState {
   questionIndex: number;
@@ -175,17 +194,13 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   return (
     <button
       type="submit"
-      className="flex h-9 w-9 enabled:cursor-pointer items-center justify-center rounded-full bg-primary/90 text-primary-foreground transition-all duration-150 hover:bg-primary hover:scale-105 disabled:pointer-events-none disabled:opacity-30 disabled:hover:scale-100 sm:h-8 sm:w-8"
+      className="flex h-9 enabled:cursor-pointer items-center justify-center gap-2 rounded-full bg-primary/90 pl-3.5 pr-2 text-primary-foreground transition-all duration-150 hover:bg-primary hover:scale-105 disabled:pointer-events-none disabled:opacity-30 disabled:hover:scale-100 sm:h-8"
       disabled={isSendBusy || isConnecting || !hasSendableContent}
-      aria-label={
-        isConnecting
-          ? "Connecting"
-          : isPreparingWorktree
-            ? "Preparing worktree"
-            : isSendBusy
-              ? "Sending"
-              : "Send message"
-      }
+      aria-label={formatSendPrimaryActionAriaLabel({
+        isConnecting,
+        isPreparingWorktree,
+        isSendBusy,
+      })}
     >
       {isConnecting || isSendBusy ? (
         <svg
@@ -207,15 +222,16 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
           />
         </svg>
       ) : (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path
-            d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <>
+          <span className="text-sm font-medium leading-none">Send</span>
+          <kbd
+            className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded bg-black/15 px-1.5 font-sans text-[11px] font-medium text-primary-foreground/85 dark:bg-white/12"
+            aria-hidden="true"
+          >
+            <span>Ctrl</span>
+            <CornerDownLeftIcon className="size-3" strokeWidth={2.25} />
+          </kbd>
+        </>
       )}
     </button>
   );
