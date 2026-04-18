@@ -562,7 +562,7 @@ function ChatMarkdown({ text, cwd, isStreaming = false, className }: ChatMarkdow
   return (
     <div
       className={cn(
-        "chat-markdown chat-markdown-flowing w-full min-w-0 text-[1rem] text-foreground/80",
+        "chat-markdown chat-markdown-flowing w-full min-w-0 text-[1.125rem] text-foreground/80",
         className,
       )}
     >
