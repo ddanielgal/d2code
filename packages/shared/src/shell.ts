@@ -13,8 +13,10 @@ const WINDOWS_SHELL_CANDIDATES = ["pwsh.exe", "powershell.exe"] as const;
 type ExecFileSyncLike = (
   file: string,
   args: ReadonlyArray<string>,
-  options: { encoding: "utf8"; timeout: number },
+  options: { encoding: "utf8"; timeout: number; env?: NodeJS.ProcessEnv },
 ) => string;
+
+const LOGIN_SHELL_PROBE_ENV_FLAG = "INTELLIJ_ENVIRONMENT_READER";
 
 export interface CommandAvailabilityOptions {
   readonly platform?: NodeJS.Platform;
@@ -195,6 +197,12 @@ export const readEnvironmentFromLoginShell: ShellEnvironmentReader = (
   const output = execFile(shell, ["-ilc", buildEnvironmentCaptureCommand(names)], {
     encoding: "utf8",
     timeout: 5000,
+    // Mark the probe as an environment reader so interactive shell startup files
+    // can skip terminal/tmux autostart side effects while we capture PATH.
+    env: {
+      ...process.env,
+      [LOGIN_SHELL_PROBE_ENV_FLAG]: "1",
+    },
   });
 
   const environment: Partial<Record<string, string>> = {};
