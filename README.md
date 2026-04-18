@@ -65,6 +65,9 @@ Before local development, prepare the environment and install dependencies:
 # Optional: only needed if you use mise for dev tool management.
 mise install
 bun install .
+
+# Build the project. If native node-gyp issues show up, skip them for now.
+bun run build
 ```
 
 Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or PR.
