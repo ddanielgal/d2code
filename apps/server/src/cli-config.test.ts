@@ -147,7 +147,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         noBrowser: true,
         startupPresentation: "browser",
         desktopBootstrapToken: undefined,
-        autoBootstrapProjectFromCwd: true,
+        autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: true,
       });
     }),
@@ -159,7 +159,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
       const baseDir = join(os.tmpdir(), "t3-cli-config-false-flags");
       const fd = yield* openBootstrapFd({
         noBrowser: true,
-        autoBootstrapProjectFromCwd: true,
+        autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: true,
       });
       const derivedPaths = yield* deriveServerPaths(baseDir, new URL("http://127.0.0.1:4173"));
