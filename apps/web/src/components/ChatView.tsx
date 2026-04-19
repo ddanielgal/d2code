@@ -165,6 +165,10 @@ import {
   shouldWriteThreadErrorToCurrentServerThread,
   waitForStartedServerThread,
 } from "./ChatView.logic";
+import {
+  applyThreadWorkspaceModeFromContext,
+  canApplyThreadWorkspaceModeFromContext,
+} from "../lib/chatThreadActions";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { useComposerHandleContext } from "../composerHandleContext";
 import {
@@ -697,8 +701,6 @@ export default function ChatView(props: ChatViewProps) {
   const [attachmentPreviewHandoffByMessageId, setAttachmentPreviewHandoffByMessageId] = useState<
     Record<string, string[]>
   >({});
-  const [pendingServerThreadEnvMode, setPendingServerThreadEnvMode] =
-    useState<DraftThreadEnvMode | null>(null);
   const [pendingServerThreadBranch, setPendingServerThreadBranch] = useState<string | null>();
   const [lastInvokedScriptByProjectId, setLastInvokedScriptByProjectId] = useLocalStorage(
     LAST_INVOKED_SCRIPT_BY_PROJECT_KEY,
@@ -2087,15 +2089,14 @@ export default function ChatView(props: ChatViewProps) {
     hasServerThread: isServerThread,
     draftThreadEnvMode: isLocalDraftThread ? draftThread?.envMode : undefined,
   });
-  const canOverrideServerThreadEnvMode = Boolean(
-    isServerThread &&
-    activeThread &&
-    activeThread.messages.length === 0 &&
-    activeThread.worktreePath === null &&
-    !envLocked,
-  );
+  const canOverrideServerThreadEnvMode =
+    !envLocked &&
+    canApplyThreadWorkspaceModeFromContext({
+      activeThread: isServerThread ? activeThread : undefined,
+      activeDraftThread: draftThread,
+    });
   const envMode: DraftThreadEnvMode = canOverrideServerThreadEnvMode
-    ? (pendingServerThreadEnvMode ?? draftThread?.envMode ?? derivedEnvMode)
+    ? (draftThread?.envMode ?? derivedEnvMode)
     : derivedEnvMode;
   const activeThreadBranch =
     canOverrideServerThreadEnvMode && pendingServerThreadBranch !== undefined
@@ -2107,7 +2108,6 @@ export default function ChatView(props: ChatViewProps) {
   });
 
   useEffect(() => {
-    setPendingServerThreadEnvMode(null);
     setPendingServerThreadBranch(undefined);
   }, [activeThread?.id]);
 
@@ -2115,7 +2115,6 @@ export default function ChatView(props: ChatViewProps) {
     if (canOverrideServerThreadEnvMode) {
       return;
     }
-    setPendingServerThreadEnvMode(null);
     setPendingServerThreadBranch(undefined);
   }, [canOverrideServerThreadEnvMode]);
 
@@ -3134,28 +3133,15 @@ export default function ChatView(props: ChatViewProps) {
   );
   const onEnvModeChange = useCallback(
     (mode: DraftThreadEnvMode) => {
-      if (canOverrideServerThreadEnvMode) {
-        setPendingServerThreadEnvMode(mode);
-        scheduleComposerFocus();
-        return;
-      }
-      if (isLocalDraftThread) {
-        setDraftThreadContext(composerDraftTarget, {
-          envMode: mode,
-          ...(mode === "worktree" && draftThread?.worktreePath ? { worktreePath: null } : {}),
-        });
-      }
+      applyThreadWorkspaceModeFromContext({
+        activeThread: isServerThread ? activeThread : undefined,
+        activeDraftThread: draftThread,
+        nextEnvMode: mode,
+        setDraftThreadContext,
+      });
       scheduleComposerFocus();
     },
-    [
-      canOverrideServerThreadEnvMode,
-      composerDraftTarget,
-      draftThread?.worktreePath,
-      isLocalDraftThread,
-      setPendingServerThreadEnvMode,
-      scheduleComposerFocus,
-      setDraftThreadContext,
-    ],
+    [activeThread, draftThread, isServerThread, scheduleComposerFocus, setDraftThreadContext],
   );
 
   const onExpandTimelineImage = useCallback((preview: ExpandedImagePreview) => {

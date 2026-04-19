@@ -313,7 +313,7 @@ export const resolveServerConfig = (
         Option.fromUndefinedOr(env.autoBootstrapProjectFromCwd),
         Option.fromUndefinedOr(bootstrap?.autoBootstrapProjectFromCwd),
       ),
-      () => mode === "web",
+      () => false,
     );
     const logWebSocketEvents = Option.getOrElse(
       resolveOptionPrecedence(

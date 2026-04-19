@@ -39,9 +39,9 @@ describe("resolveDesktopAppBranding", () => {
         appVersion: "0.0.17-nightly.20260414.1",
       }),
     ).toEqual({
-      baseName: "T3 Code",
+      baseName: "D2 Code",
       stageLabel: "Nightly",
-      displayName: "T3 Code (Nightly)",
+      displayName: "D2 Code (Nightly)",
     });
   });
 });

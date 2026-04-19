@@ -1,3 +1,5 @@
+@import "@fontsource/crimson-text/400.css";
+@import "@fontsource/crimson-text/600.css";
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark, .dark *));
@@ -141,6 +143,11 @@ body {
   min-height: 100vh;
 }
 
+:root {
+  --font-markdown-body:
+    "Crimson Text", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
 html,
 body,
 #root {
@@ -252,6 +259,13 @@ label:has(> select#reasoning-effort) select {
   word-break: break-word;
 }
 
+.chat-markdown-flowing {
+  font-family: var(--font-markdown-body);
+  line-height: 1.5;
+  text-align: justify;
+  text-wrap: pretty;
+}
+
 .chat-markdown > :first-child {
   margin-top: 0;
 }
@@ -260,13 +274,38 @@ label:has(> select#reasoning-effort) select {
   margin-bottom: 0;
 }
 
-.chat-markdown p,
-.chat-markdown ul,
-.chat-markdown ol,
-.chat-markdown blockquote,
-.chat-markdown pre,
-.chat-markdown table {
-  margin: 0.65rem 0;
+.chat-markdown-flowing > :not(:first-child) {
+  margin-top: 1.5rem;
+}
+
+.chat-markdown-flowing p,
+.chat-markdown-flowing ul,
+.chat-markdown-flowing ol,
+.chat-markdown-flowing blockquote,
+.chat-markdown-flowing pre,
+.chat-markdown-flowing table,
+.chat-markdown-flowing hr,
+.chat-markdown-flowing h1,
+.chat-markdown-flowing h2,
+.chat-markdown-flowing h3,
+.chat-markdown-flowing h4,
+.chat-markdown-flowing h5,
+.chat-markdown-flowing h6 {
+  margin: 0;
+}
+
+.chat-markdown-flowing p + p,
+.chat-markdown-flowing p + ul,
+.chat-markdown-flowing p + ol,
+.chat-markdown-flowing ul + p,
+.chat-markdown-flowing ol + p,
+.chat-markdown-flowing ul + ul,
+.chat-markdown-flowing ol + ol,
+.chat-markdown-flowing ul + ol,
+.chat-markdown-flowing ol + ul,
+.chat-markdown-flowing blockquote + p,
+.chat-markdown-flowing p + blockquote {
+  margin-top: 1.5rem;
 }
 
 .chat-markdown ul {

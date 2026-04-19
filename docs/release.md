@@ -10,10 +10,10 @@ This document covers the unified release workflow for stable and nightly desktop
   - scheduled nightly at `09:00 UTC`
   - manual `workflow_dispatch` for either channel
 - Runs quality gates first: lint, typecheck, test.
-- Builds four artifacts in parallel for both channels:
+- Builds desktop artifacts in parallel for both channels:
   - macOS `arm64` DMG
   - macOS `x64` DMG
-  - Linux `x64` AppImage
+  - Linux `x64` AppImage and `.deb`
   - Windows `x64` NSIS installer
 - Publishes one GitHub Release with all produced files.
   - Stable tags with a suffix after `X.Y.Z` (for example `1.2.3-alpha.1`) are published as GitHub prereleases.
@@ -57,7 +57,7 @@ This document covers the unified release workflow for stable and nightly desktop
   - set `T3CODE_DESKTOP_UPDATE_GITHUB_TOKEN` (or `GH_TOKEN`) in the desktop app runtime environment.
   - the app forwards it as an `Authorization: Bearer <token>` request header for updater HTTP calls.
 - Required release assets for updater:
-  - platform installers (`.exe`, `.dmg`, `.AppImage`, plus macOS `.zip` for Squirrel.Mac update payloads)
+  - platform installers (`.exe`, `.dmg`, `.AppImage`, `.deb`, plus macOS `.zip` for Squirrel.Mac update payloads)
   - channel metadata: `latest*.yml` for stable releases, `nightly*.yml` for nightly releases
   - `*.blockmap` files (used for differential downloads)
 - macOS metadata note:

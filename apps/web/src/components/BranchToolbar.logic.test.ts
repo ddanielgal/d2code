@@ -1,6 +1,7 @@
 import { EnvironmentId, type GitBranch } from "@t3tools/contracts";
 import { describe, expect, it } from "vitest";
 import {
+  canChangeThreadWorkspaceMode,
   dedupeRemoteBranchesWithLocalMatches,
   deriveLocalBranchNameFromRemoteRef,
   resolveEnvironmentOptionLabel,
@@ -138,6 +139,48 @@ describe("resolveEffectiveEnvMode", () => {
         draftThreadEnvMode: "worktree",
       }),
     ).toBe("worktree");
+  });
+});
+
+describe("canChangeThreadWorkspaceMode", () => {
+  it("allows draft threads to change workspace mode before first send", () => {
+    expect(
+      canChangeThreadWorkspaceMode({
+        hasServerThread: false,
+        activeWorktreePath: null,
+        envLocked: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("allows empty server threads without an attached worktree to change workspace mode", () => {
+    expect(
+      canChangeThreadWorkspaceMode({
+        hasServerThread: true,
+        activeWorktreePath: null,
+        envLocked: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("locks workspace mode once a server thread is attached to a worktree", () => {
+    expect(
+      canChangeThreadWorkspaceMode({
+        hasServerThread: true,
+        activeWorktreePath: "/repo/.t3/worktrees/feature-a",
+        envLocked: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("locks workspace mode when the thread is otherwise environment-locked", () => {
+    expect(
+      canChangeThreadWorkspaceMode({
+        hasServerThread: false,
+        activeWorktreePath: null,
+        envLocked: true,
+      }),
+    ).toBe(false);
   });
 });
 

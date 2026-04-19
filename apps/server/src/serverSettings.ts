@@ -44,6 +44,9 @@ import { type DeepPartial, deepMerge } from "@t3tools/shared/Struct";
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
 import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
 
+const makeAtomicWriteTempPath = (targetPath: string) =>
+  `${targetPath}.${process.pid}.${Date.now()}.${crypto.randomUUID()}.tmp`;
+
 export interface ServerSettingsShape {
   /** Start the settings runtime and attach file watching. */
   readonly start: Effect.Effect<void, ServerSettingsError>;
@@ -233,7 +236,7 @@ const makeServerSettings = Effect.gen(function* () {
   const getSettingsFromCache = Cache.get(settingsCache, cacheKey);
 
   const writeSettingsAtomically = (settings: ServerSettings) => {
-    const tempPath = `${settingsPath}.${process.pid}.${Date.now()}.tmp`;
+    const tempPath = makeAtomicWriteTempPath(settingsPath);
     const sparseSettings = stripDefaultServerSettings(settings, DEFAULT_SERVER_SETTINGS) ?? {};
 
     return Effect.succeed(`${JSON.stringify(sparseSettings, null, 2)}\n`).pipe(

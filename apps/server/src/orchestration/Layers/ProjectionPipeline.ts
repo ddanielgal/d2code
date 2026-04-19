@@ -682,6 +682,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         }
 
         case "thread.message-sent":
+        case "thread.message-replaced":
         case "thread.proposed-plan-upserted":
         case "thread.activity-appended":
         case "thread.approval-response-requested":
@@ -789,6 +790,34 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
             ...(nextAttachments !== undefined ? { attachments: [...nextAttachments] } : {}),
             isStreaming: event.payload.streaming,
             createdAt: previousMessage?.createdAt ?? event.payload.createdAt,
+            updatedAt: event.payload.updatedAt,
+          });
+          return;
+        }
+
+        case "thread.message-replaced": {
+          const existingMessage = yield* projectionThreadMessageRepository.getByMessageId({
+            messageId: event.payload.messageId,
+          });
+          const previousMessage = Option.getOrUndefined(existingMessage);
+          if (!previousMessage) {
+            // Replace targets a streaming assistant message; if it doesn't
+            // exist yet, materialize it so the authoritative text is preserved.
+            yield* projectionThreadMessageRepository.upsert({
+              messageId: event.payload.messageId,
+              threadId: event.payload.threadId,
+              turnId: event.payload.turnId,
+              role: "assistant",
+              text: event.payload.text,
+              isStreaming: true,
+              createdAt: event.payload.updatedAt,
+              updatedAt: event.payload.updatedAt,
+            });
+            return;
+          }
+          yield* projectionThreadMessageRepository.upsert({
+            ...previousMessage,
+            text: event.payload.text,
             updatedAt: event.payload.updatedAt,
           });
           return;

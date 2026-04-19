@@ -722,6 +722,9 @@ const make = Effect.gen(function* () {
   const clearBufferedAssistantText = (messageId: MessageId) =>
     Cache.invalidate(bufferedAssistantTextByMessageId, messageId);
 
+  const replaceBufferedAssistantText = (messageId: MessageId, text: string) =>
+    Cache.set(bufferedAssistantTextByMessageId, messageId, text);
+
   const appendBufferedProposedPlan = (planId: string, delta: string, createdAt: string) =>
     Cache.getOption(bufferedProposedPlanById, planId).pipe(
       Effect.flatMap((existingEntry) => {
@@ -1225,6 +1228,10 @@ const make = Effect.gen(function* () {
         event.type === "content.delta" && event.payload.streamKind === "assistant_text"
           ? event.payload.delta
           : undefined;
+      const assistantReplaceText =
+        event.type === "content.replace" && event.payload.streamKind === "assistant_text"
+          ? event.payload.text
+          : undefined;
       const proposedPlanDelta =
         event.type === "turn.proposed.delta" ? event.payload.delta : undefined;
 
@@ -1267,6 +1274,36 @@ const make = Effect.gen(function* () {
             createdAt: now,
           });
         }
+      }
+
+      if (assistantReplaceText !== undefined) {
+        const turnId = toTurnId(event.turnId);
+        const assistantMessageId = yield* getOrCreateAssistantMessageId({
+          threadId: thread.id,
+          event,
+          ...(turnId ? { turnId } : {}),
+        });
+        if (turnId) {
+          yield* rememberAssistantMessageId(thread.id, turnId, assistantMessageId);
+        }
+        // Buffered streaming: replace any buffered text so the next flush
+        // emits the authoritative snapshot rather than appending to stale text.
+        const assistantDeliveryMode: AssistantDeliveryMode = yield* Effect.map(
+          serverSettingsService.getSettings,
+          (settings) => (settings.enableAssistantStreaming ? "streaming" : "buffered"),
+        );
+        if (assistantDeliveryMode === "buffered") {
+          yield* replaceBufferedAssistantText(assistantMessageId, assistantReplaceText);
+        }
+        yield* orchestrationEngine.dispatch({
+          type: "thread.message.assistant.replace",
+          commandId: providerCommandId(event, "assistant-replace"),
+          threadId: thread.id,
+          messageId: assistantMessageId,
+          text: assistantReplaceText,
+          ...(turnId ? { turnId } : {}),
+          createdAt: now,
+        });
       }
 
       const pauseForUserTurnId =

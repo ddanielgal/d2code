@@ -19,6 +19,7 @@ interface PersistedUiState {
   expandedProjectCwds?: string[];
   projectOrderCwds?: string[];
   threadChangedFilesExpandedById?: Record<string, Record<string, boolean>>;
+  worktreeGroupExpandedById?: Record<string, boolean>;
 }
 
 export interface UiProjectState {
@@ -31,7 +32,11 @@ export interface UiThreadState {
   threadChangedFilesExpandedById: Record<string, Record<string, boolean>>;
 }
 
-export interface UiState extends UiProjectState, UiThreadState {}
+export interface UiWorktreeState {
+  worktreeGroupExpandedById: Record<string, boolean>;
+}
+
+export interface UiState extends UiProjectState, UiThreadState, UiWorktreeState {}
 
 export interface SyncProjectInput {
   key: string;
@@ -48,6 +53,7 @@ const initialState: UiState = {
   projectOrder: [],
   threadLastVisitedAtById: {},
   threadChangedFilesExpandedById: {},
+  worktreeGroupExpandedById: {},
 };
 
 const persistedExpandedProjectCwds = new Set<string>();
@@ -79,6 +85,9 @@ function readPersistedState(): UiState {
       threadChangedFilesExpandedById: sanitizePersistedThreadChangedFilesExpanded(
         parsed.threadChangedFilesExpandedById,
       ),
+      worktreeGroupExpandedById: sanitizePersistedWorktreeGroupExpanded(
+        parsed.worktreeGroupExpandedById,
+      ),
     };
   } catch {
     return initialState;
@@ -107,6 +116,23 @@ function sanitizePersistedThreadChangedFilesExpanded(
 
     if (Object.keys(nextTurns).length > 0) {
       nextState[threadId] = nextTurns;
+    }
+  }
+
+  return nextState;
+}
+
+function sanitizePersistedWorktreeGroupExpanded(
+  value: PersistedUiState["worktreeGroupExpandedById"],
+): Record<string, boolean> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const nextState: Record<string, boolean> = {};
+  for (const [groupId, expanded] of Object.entries(value)) {
+    if (groupId && expanded === false) {
+      nextState[groupId] = false;
     }
   }
 
@@ -151,12 +177,16 @@ function persistState(state: UiState): void {
         return Object.keys(nextTurns).length > 0 ? [[threadId, nextTurns]] : [];
       }),
     );
+    const worktreeGroupExpandedById = Object.fromEntries(
+      Object.entries(state.worktreeGroupExpandedById).filter(([, expanded]) => expanded === false),
+    );
     window.localStorage.setItem(
       PERSISTED_STATE_KEY,
       JSON.stringify({
         expandedProjectCwds,
         projectOrderCwds,
         threadChangedFilesExpandedById,
+        worktreeGroupExpandedById,
       } satisfies PersistedUiState),
     );
     if (!legacyKeysCleanedUp) {
@@ -467,6 +497,17 @@ export function toggleProject(state: UiState, projectId: string): UiState {
   };
 }
 
+export function toggleWorktreeGroup(state: UiState, groupId: string): UiState {
+  const expanded = state.worktreeGroupExpandedById[groupId] ?? true;
+  return {
+    ...state,
+    worktreeGroupExpandedById: {
+      ...state.worktreeGroupExpandedById,
+      [groupId]: !expanded,
+    },
+  };
+}
+
 export function setProjectExpanded(state: UiState, projectId: string, expanded: boolean): UiState {
   if ((state.projectExpandedById[projectId] ?? true) === expanded) {
     return state;
@@ -531,6 +572,7 @@ interface UiStateStore extends UiState {
   clearThreadUi: (threadId: string) => void;
   setThreadChangedFilesExpanded: (threadId: string, turnId: string, expanded: boolean) => void;
   toggleProject: (projectId: string) => void;
+  toggleWorktreeGroup: (groupId: string) => void;
   setProjectExpanded: (projectId: string, expanded: boolean) => void;
   reorderProjects: (
     draggedProjectIds: readonly string[],
@@ -550,6 +592,7 @@ export const useUiStateStore = create<UiStateStore>((set) => ({
   setThreadChangedFilesExpanded: (threadId, turnId, expanded) =>
     set((state) => setThreadChangedFilesExpanded(state, threadId, turnId, expanded)),
   toggleProject: (projectId) => set((state) => toggleProject(state, projectId)),
+  toggleWorktreeGroup: (groupId) => set((state) => toggleWorktreeGroup(state, groupId)),
   setProjectExpanded: (projectId, expanded) =>
     set((state) => setProjectExpanded(state, projectId, expanded)),
   reorderProjects: (draggedProjectIds, targetProjectIds) =>

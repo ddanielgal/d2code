@@ -9,6 +9,7 @@ import {
   setThreadChangedFilesExpanded,
   syncProjects,
   syncThreads,
+  toggleWorktreeGroup,
   type UiState,
 } from "./uiStateStore";
 
@@ -18,6 +19,7 @@ function makeUiState(overrides: Partial<UiState> = {}): UiState {
     projectOrder: [],
     threadLastVisitedAtById: {},
     threadChangedFilesExpandedById: {},
+    worktreeGroupExpandedById: {},
     ...overrides,
   };
 }
@@ -344,5 +346,29 @@ describe("uiStateStore pure functions", () => {
     const next = setThreadChangedFilesExpanded(initialState, thread1, "turn-1", true);
 
     expect(next.threadChangedFilesExpandedById).toEqual({});
+  });
+
+  it("toggleWorktreeGroup defaults to expanded and toggles to collapsed", () => {
+    const initialState = makeUiState();
+
+    const next = toggleWorktreeGroup(initialState, "project-1::worktree:/tmp/repo/feature-a");
+
+    expect(next.worktreeGroupExpandedById).toEqual({
+      "project-1::worktree:/tmp/repo/feature-a": false,
+    });
+  });
+
+  it("toggleWorktreeGroup expands a previously collapsed group", () => {
+    const initialState = makeUiState({
+      worktreeGroupExpandedById: {
+        "project-1::root": false,
+      },
+    });
+
+    const next = toggleWorktreeGroup(initialState, "project-1::root");
+
+    expect(next.worktreeGroupExpandedById).toEqual({
+      "project-1::root": true,
+    });
   });
 });

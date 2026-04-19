@@ -17,6 +17,9 @@ const decodePersistedServerRuntimeState = Schema.decodeUnknownEffect(
   Schema.fromJsonString(PersistedServerRuntimeState),
 );
 
+const makeAtomicWriteTempPath = (targetPath: string) =>
+  `${targetPath}.${process.pid}.${Date.now()}.${crypto.randomUUID()}.tmp`;
+
 const runtimeOriginForConfig = (
   config: Pick<ServerConfigShape, "host">,
   port: number,
@@ -45,7 +48,7 @@ export const persistServerRuntimeState = (input: {
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const pathService = yield* Path.Path;
-    const tempPath = `${input.path}.${process.pid}.${Date.now()}.tmp`;
+    const tempPath = makeAtomicWriteTempPath(input.path);
     return yield* fs.makeDirectory(pathService.dirname(input.path), { recursive: true }).pipe(
       Effect.flatMap(() => fs.writeFileString(tempPath, `${JSON.stringify(input.state)}\n`)),
       Effect.flatMap(() => fs.rename(tempPath, input.path)),

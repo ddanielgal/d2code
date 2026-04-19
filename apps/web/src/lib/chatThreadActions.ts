@@ -1,6 +1,8 @@
 import { scopeProjectRef } from "@t3tools/client-runtime";
-import type { EnvironmentId, ProjectId, ScopedProjectRef } from "@t3tools/contracts";
-import type { DraftThreadEnvMode } from "../composerDraftStore";
+import type { EnvironmentId, ProjectId, ScopedProjectRef, ThreadId } from "@t3tools/contracts";
+import type { DraftId, DraftThreadEnvMode } from "../composerDraftStore";
+
+type DraftThreadTarget = DraftId | { environmentId: EnvironmentId; threadId: ThreadId };
 
 interface ThreadContextLike {
   environmentId: EnvironmentId;
@@ -10,6 +12,7 @@ interface ThreadContextLike {
 }
 
 interface DraftThreadContextLike extends ThreadContextLike {
+  threadId: ThreadId;
   envMode: DraftThreadEnvMode;
 }
 
@@ -34,6 +37,26 @@ export interface ChatThreadActionContext {
   readonly handleNewThread: NewThreadHandler;
 }
 
+interface ThreadWorkspaceContextLike {
+  readonly threadId?: ThreadId;
+  readonly messages: ReadonlyArray<unknown>;
+  readonly session: { status: string } | null;
+  readonly worktreePath: string | null;
+}
+
+interface ApplyThreadWorkspaceModeFromContextInput {
+  readonly activeThread: ThreadWorkspaceContextLike | null | undefined;
+  readonly activeDraftThread: DraftThreadContextLike | null;
+  readonly nextEnvMode: DraftThreadEnvMode;
+  readonly setDraftThreadContext: (
+    threadTarget: DraftThreadTarget,
+    options: {
+      envMode?: DraftThreadEnvMode;
+      worktreePath?: string | null;
+    },
+  ) => void;
+}
+
 export function resolveThreadActionProjectRef(
   context: ChatThreadActionContext,
 ): ScopedProjectRef | null {
@@ -47,6 +70,48 @@ export function resolveThreadActionProjectRef(
     );
   }
   return context.defaultProjectRef;
+}
+
+export function canApplyThreadWorkspaceModeFromContext(
+  input: Pick<ApplyThreadWorkspaceModeFromContextInput, "activeThread" | "activeDraftThread">,
+): boolean {
+  const activeThread = input.activeThread;
+  if (activeThread) {
+    return (
+      input.activeDraftThread !== null &&
+      activeThread.messages.length === 0 &&
+      activeThread.worktreePath === null &&
+      (activeThread.session === null || activeThread.session.status === "closed")
+    );
+  }
+
+  return input.activeDraftThread !== null;
+}
+
+export function applyThreadWorkspaceModeFromContext(
+  input: ApplyThreadWorkspaceModeFromContextInput,
+): boolean {
+  if (!canApplyThreadWorkspaceModeFromContext(input)) {
+    return false;
+  }
+
+  if (input.activeDraftThread) {
+    input.setDraftThreadContext(
+      {
+        environmentId: input.activeDraftThread.environmentId,
+        threadId: input.activeDraftThread.threadId,
+      },
+      {
+        envMode: input.nextEnvMode,
+        ...(input.nextEnvMode === "worktree" && input.activeDraftThread.worktreePath
+          ? { worktreePath: null }
+          : {}),
+      },
+    );
+    return true;
+  }
+
+  return false;
 }
 
 function buildContextualThreadOptions(context: ChatThreadActionContext): NewThreadOptions {
