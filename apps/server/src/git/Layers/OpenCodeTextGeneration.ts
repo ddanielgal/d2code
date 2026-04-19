@@ -35,6 +35,90 @@ import {
 
 const OPENCODE_TEXT_GENERATION_IDLE_TTL_MS = 30_000;
 
+interface OpenCodePromptResultData {
+  readonly info?: {
+    readonly structured?: unknown;
+  };
+  readonly parts?: ReadonlyArray<{
+    readonly type?: string;
+    readonly text?: string;
+  }>;
+}
+
+function stripJsonCodeFence(value: string): string {
+  const trimmed = value.trim();
+  const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fencedMatch?.[1]?.trim() ?? trimmed;
+}
+
+function parseStructuredOutputText(value: string): unknown | undefined {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  const candidates = [stripJsonCodeFence(trimmed)];
+  const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1]?.trim();
+  if (fencedMatch && !candidates.includes(fencedMatch)) {
+    candidates.push(fencedMatch);
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const jsonObjectCandidate = trimmed.slice(firstBrace, lastBrace + 1).trim();
+    if (!candidates.includes(jsonObjectCandidate)) {
+      candidates.push(jsonObjectCandidate);
+    }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      continue;
+    }
+  }
+
+  return undefined;
+}
+
+function formatOpenCodeResponseForLog(value: unknown): string {
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized.length <= 2_000) {
+      return serialized;
+    }
+    return `${serialized.slice(0, 2_000)}...(truncated)`;
+  } catch {
+    return "[unserializable OpenCode response]";
+  }
+}
+
+function extractStructuredOutput(
+  resultData: OpenCodePromptResultData | undefined,
+): unknown | undefined {
+  const structured = resultData?.info?.structured;
+  if (structured !== undefined) {
+    return structured;
+  }
+
+  const textOutput =
+    resultData?.parts
+      ?.filter(
+        (part): part is { readonly type: "text"; readonly text: string } =>
+          part.type === "text" && typeof part.text === "string",
+      )
+      .map((part) => part.text)
+      .join("\n")
+      .trim() ?? "";
+  if (textOutput.length === 0) {
+    return undefined;
+  }
+
+  return parseStructuredOutputText(textOutput);
+}
+
 interface SharedOpenCodeTextGenerationServerState {
   server: OpenCodeServerProcess | null;
   binaryPath: string | null;
@@ -251,9 +335,21 @@ const makeOpenCodeTextGeneration = Effect.gen(function* () {
             },
             parts: [{ type: "text", text: input.prompt }, ...fileParts],
           });
-          const structured = result.data?.info?.structured;
+          await Effect.logDebug("opencode text generation response", {
+            operation: input.operation,
+            sessionId: session.data.id,
+            responseData: result.data,
+          }).pipe(Effect.runPromise);
+          const structured = extractStructuredOutput(result.data);
+          await Effect.logDebug("opencode text generation structured output", {
+            operation: input.operation,
+            sessionId: session.data.id,
+            structuredOutput: structured,
+          }).pipe(Effect.runPromise);
           if (structured === undefined) {
-            throw new Error("OpenCode returned no structured output.");
+            throw new Error(
+              `OpenCode returned no structured output. Response: ${formatOpenCodeResponseForLog(result.data)}`,
+            );
           }
           return structured;
         },
@@ -283,7 +379,7 @@ const makeOpenCodeTextGeneration = Effect.gen(function* () {
         Effect.fail(
           new TextGenerationError({
             operation: input.operation,
-            detail: "OpenCode returned invalid structured output.",
+            detail: `OpenCode returned invalid structured output. Structured output: ${formatOpenCodeResponseForLog(structuredOutput)}`,
             cause,
           }),
         ),
