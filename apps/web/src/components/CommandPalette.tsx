@@ -580,7 +580,12 @@ function OpenCommandPaletteDialog() {
   }
 
   function handleQueryChange(nextQuery: string): void {
-    setHighlightedItemValue(null);
+    // Do NOT proactively clear `highlightedItemValue` here. Base UI owns the highlight
+    // state (we now feed it the filtered values via `filteredItems` on <Command>) and
+    // will re-fire `onItemHighlighted` only when the value at activeIndex actually
+    // changes. If we clear our mirror eagerly and the new first item happens to equal
+    // the previous first item (e.g. it was already the top row before typing), Base UI
+    // stays silent and the row loses its highlight until the user presses an arrow key.
     setQuery(nextQuery);
     if (nextQuery === "" && currentView?.initialQuery) {
       popView();
@@ -948,6 +953,28 @@ function OpenCommandPaletteDialog() {
     displayedGroups = relativePathNeedsActiveProject ? [] : browseGroups;
   }
 
+  // Base UI's Autocomplete only runs its auto-highlight / activeIndex bookkeeping when
+  // it owns the item data (via the `items` prop). We filter groups ourselves and hand
+  // Base UI children through `<CommandCollection>`, so without a hint it neither
+  // re-fires `onItemHighlighted` after the filtered list changes nor knows which index
+  // ArrowDown should move away from. That caused two bugs:
+  //   1. The first row had no visible highlight after typing (highlightedItemValue
+  //      stayed null from handleQueryChange).
+  //   2. ArrowDown appeared to do nothing the first time — Base UI's activeIndex was
+  //      null, so it moved to 0 on the first press (same row our fallback was already
+  //      highlighting), then to 1 on the second press.
+  // Passing the flat list of currently-visible values as `filteredItems` lets Base UI
+  // track the list it is navigating, which makes its auto-highlight effect fire
+  // `onItemHighlighted` with the first item after filtering and keeps its activeIndex
+  // in sync with what the user sees.
+  const flatDisplayedItemValues = useMemo(() => {
+    const values: string[] = [];
+    for (const group of displayedGroups) {
+      for (const item of group.items) values.push(item.value);
+    }
+    return values;
+  }, [displayedGroups]);
+
   const inputPlaceholder = getCommandPaletteInputPlaceholder(paletteMode);
   const isSubmenu = paletteMode === "submenu" || paletteMode === "submenu-browse";
   const hasHighlightedBrowseItem = highlightedItemValue?.startsWith("browse:") ?? false;
@@ -1081,6 +1108,7 @@ function OpenCommandPaletteDialog() {
         key={`${viewStack.length}-${browseGeneration}-${isBrowsing}`}
         aria-label="Command palette"
         autoHighlight={isBrowsing ? false : "always"}
+        filteredItems={flatDisplayedItemValues}
         mode="none"
         onItemHighlighted={(value) => {
           setHighlightedItemValue(typeof value === "string" ? value : null);
