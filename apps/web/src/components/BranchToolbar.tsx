@@ -103,6 +103,7 @@ export const BranchToolbar = memo(function BranchToolbar({
           effectiveEnvMode={effectiveEnvMode}
           activeWorktreePath={activeWorktreePath}
           onEnvModeChange={onEnvModeChange}
+          {...(onComposerFocusRequest ? { onComposerFocusRequest } : {})}
         />
       </div>
 

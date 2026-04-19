@@ -22,6 +22,7 @@ interface BranchToolbarEnvModeSelectorProps {
   effectiveEnvMode: EnvMode;
   activeWorktreePath: string | null;
   onEnvModeChange: (mode: EnvMode) => void;
+  onComposerFocusRequest?: () => void;
 }
 
 export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSelector({
@@ -29,6 +30,7 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
   effectiveEnvMode,
   activeWorktreePath,
   onEnvModeChange,
+  onComposerFocusRequest,
 }: BranchToolbarEnvModeSelectorProps) {
   const envModeItems = useMemo(
     () => [
@@ -59,7 +61,10 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
   return (
     <Select
       value={effectiveEnvMode}
-      onValueChange={(value) => onEnvModeChange(value as EnvMode)}
+      onValueChange={(value) => {
+        onEnvModeChange(value as EnvMode);
+        onComposerFocusRequest?.();
+      }}
       items={envModeItems}
     >
       <SelectTrigger variant="ghost" size="xs" className="font-medium" aria-label="Workspace">

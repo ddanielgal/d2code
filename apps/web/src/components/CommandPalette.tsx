@@ -242,6 +242,12 @@ function OpenCommandPaletteDialog() {
   const savedEnvironmentRegistry = useSavedEnvironmentRegistryStore((state) => state.byId);
   const savedEnvironmentRuntimeById = useSavedEnvironmentRuntimeStore((state) => state.byId);
 
+  const focusComposerOnNextFrame = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      composerHandleRef?.current?.focusAtEnd();
+    });
+  }, [composerHandleRef]);
+
   const addProjectEnvironmentOptions = useMemo(() => {
     const options: AddProjectEnvironmentOption[] = [];
     const seenEnvironmentIds = new Set<EnvironmentId>();
@@ -744,6 +750,7 @@ function OpenCommandPaletteDialog() {
                     nextEnvMode: "local",
                     setDraftThreadContext,
                   });
+                  focusComposerOnNextFrame();
                 },
               },
               {
@@ -760,6 +767,7 @@ function OpenCommandPaletteDialog() {
                     nextEnvMode: "worktree",
                     setDraftThreadContext,
                   });
+                  focusComposerOnNextFrame();
                 },
               },
             ],

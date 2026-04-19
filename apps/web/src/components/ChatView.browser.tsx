@@ -1090,6 +1090,15 @@ async function waitForComposerEditor(): Promise<HTMLElement> {
   );
 }
 
+async function waitForComposerFocus(): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      expect(document.activeElement).toBe(await waitForComposerEditor());
+    },
+    { timeout: 8_000, interval: 16 },
+  );
+}
+
 async function pressComposerKey(key: string): Promise<void> {
   const composerEditor = await waitForComposerEditor();
   composerEditor.focus();
@@ -2464,6 +2473,8 @@ describe("ChatView timeline estimator parity (full app)", () => {
     try {
       (await waitForButtonByText("Current checkout")).click();
       await page.getByText("New worktree", { exact: true }).click();
+
+      await waitForComposerFocus();
 
       await vi.waitFor(
         () => {
@@ -4216,6 +4227,8 @@ describe("ChatView timeline estimator parity (full app)", () => {
       await expect.element(palette.getByText("New worktree", { exact: true })).toBeInTheDocument();
       await palette.getByText("New worktree", { exact: true }).click();
 
+      await waitForComposerFocus();
+
       await vi.waitFor(
         () => {
           expect(findButtonByText("New worktree")).toBeTruthy();
@@ -4230,6 +4243,8 @@ describe("ChatView timeline estimator parity (full app)", () => {
         .element(palette.getByText("Current checkout", { exact: true }))
         .toBeInTheDocument();
       await palette.getByText("Current checkout", { exact: true }).click();
+
+      await waitForComposerFocus();
 
       await vi.waitFor(
         () => {
