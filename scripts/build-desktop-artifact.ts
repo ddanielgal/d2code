@@ -50,6 +50,14 @@ const DESKTOP_BUILD_AUTHOR = {
   email: "opensource@t3.tools",
 } as const;
 const DESKTOP_BUILD_HOMEPAGE = "https://github.com/pingdotgg/t3code";
+const DESKTOP_BUILD_BASE_NAME = "D2 Code";
+const DESKTOP_ARTIFACT_BASE_NAME = "D2-Code";
+const DESKTOP_PACKAGE_NAME = "d2code";
+const LINUX_DESKTOP_ICON_NAME = "d2code";
+const LINUX_EXECUTABLE_NAME = "d2code";
+const LINUX_STARTUP_WM_CLASS = "d2code";
+const LINUX_ICON_SET_DIR_NAME = "icons";
+const LINUX_ICON_FILE_NAME = "512x512.png";
 
 const PLATFORM_CONFIG: Record<typeof BuildPlatform.Type, PlatformConfig> = {
   mac: {
@@ -176,28 +184,32 @@ const resolvePythonForNodeGyp = Effect.fn("resolvePythonForNodeGyp")(function* (
     }
   }
 
-  const probe = yield* spawnAndCollectOutput(
-    ChildProcess.make("python", ["-c", "import sys;print(sys.executable)"]),
-  ).pipe(
-    Effect.catch(() =>
-      Effect.succeed({
-        stdout: "",
-        stderr: "",
-        exitCode: 1,
-      }),
-    ),
-  );
+  const probeCandidates =
+    process.platform === "win32" ? ["python"] : ["/usr/bin/python3", "python3", "python"];
+  for (const candidate of probeCandidates) {
+    const probe = yield* spawnAndCollectOutput(
+      ChildProcess.make(candidate, ["-c", "import sys;print(sys.executable)"]),
+    ).pipe(
+      Effect.catch(() =>
+        Effect.succeed({
+          stdout: "",
+          stderr: "",
+          exitCode: 1,
+        }),
+      ),
+    );
 
-  if (probe.exitCode !== 0) {
-    return undefined;
+    if (probe.exitCode !== 0) {
+      continue;
+    }
+
+    const executable = probe.stdout.trim();
+    if (executable && (yield* fs.exists(executable))) {
+      return executable;
+    }
   }
 
-  const executable = probe.stdout.trim();
-  if (!executable || !(yield* fs.exists(executable))) {
-    return undefined;
-  }
-
-  return executable;
+  return undefined;
 });
 
 interface ResolvedBuildOptions {
@@ -455,7 +467,10 @@ function stageLinuxIcons(stageResourcesDir: string, sourcePng: string) {
       });
     }
 
-    const iconPath = path.join(stageResourcesDir, "icon.png");
+    const iconSetDir = path.join(stageResourcesDir, LINUX_ICON_SET_DIR_NAME);
+    yield* fs.makeDirectory(iconSetDir, { recursive: true });
+
+    const iconPath = path.join(iconSetDir, LINUX_ICON_FILE_NAME);
     yield* fs.copyFile(sourcePng, iconPath);
   });
 }
@@ -580,8 +595,33 @@ export function resolveMockUpdateServerUrl(mockUpdateServerPort: number | undefi
 
 export function resolveDesktopProductName(version: string): string {
   return resolveDesktopUpdateChannel(version) === "nightly"
-    ? "T3 Code (Nightly)"
-    : (desktopPackageJson.productName ?? "T3 Code");
+    ? `${DESKTOP_BUILD_BASE_NAME} (Nightly)`
+    : (desktopPackageJson.productName ?? DESKTOP_BUILD_BASE_NAME);
+}
+
+export function resolveDesktopBuildDescription(): string {
+  return `${DESKTOP_BUILD_BASE_NAME} desktop build`;
+}
+
+export function resolveLinuxDesktopEntry(version: string): Record<string, string> {
+  return {
+    Name: resolveDesktopProductName(version),
+    Comment: resolveDesktopBuildDescription(),
+    Icon: LINUX_DESKTOP_ICON_NAME,
+    StartupWMClass: LINUX_STARTUP_WM_CLASS,
+  };
+}
+
+export function resolveLinuxIconBuildPath(): string {
+  return `${LINUX_ICON_SET_DIR_NAME}/${LINUX_ICON_FILE_NAME}`;
+}
+
+export function resolveDesktopArtifactNameTemplate(): string {
+  return `${DESKTOP_ARTIFACT_BASE_NAME}-${"${version}"}-${"${arch}"}.${"${ext}"}`;
+}
+
+export function resolveDesktopPackageName(): string {
+  return DESKTOP_PACKAGE_NAME;
 }
 
 const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -594,9 +634,9 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
 ) {
   const targets = resolveBuildTargets(platform, target);
   const buildConfig: Record<string, unknown> = {
-    appId: "com.t3tools.t3code",
+    appId: "com.t3tools.d2code",
     productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    artifactName: resolveDesktopArtifactNameTemplate(),
     directories: {
       buildResources: "apps/desktop/resources",
     },
@@ -625,14 +665,12 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "linux") {
     buildConfig.linux = {
       target: targets,
-      executableName: "t3code",
-      icon: "icon.png",
+      executableName: LINUX_EXECUTABLE_NAME,
+      icon: resolveLinuxIconBuildPath(),
       category: "Development",
       maintainer: `${DESKTOP_BUILD_AUTHOR.name} <${DESKTOP_BUILD_AUTHOR.email}>`,
       desktop: {
-        entry: {
-          StartupWMClass: "t3code",
-        },
+        entry: resolveLinuxDesktopEntry(version),
       },
     };
   }
@@ -806,12 +844,12 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   yield* fs.copy(stageResourcesDir, path.join(stageAppDir, "apps/desktop/prod-resources"));
 
   const stagePackageJson: StagePackageJson = {
-    name: "t3code",
+    name: resolveDesktopPackageName(),
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,
     private: true,
-    description: "T3 Code desktop build",
+    description: resolveDesktopBuildDescription(),
     author: DESKTOP_BUILD_AUTHOR,
     homepage: DESKTOP_BUILD_HOMEPAGE,
     main: "apps/desktop/dist-electron/main.cjs",
@@ -836,16 +874,6 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const stagePackageJsonString = yield* encodeJsonString(stagePackageJson);
   yield* fs.writeFileString(path.join(stageAppDir, "package.json"), `${stagePackageJsonString}\n`);
 
-  yield* Effect.log("[desktop-artifact] Installing staged production dependencies...");
-  yield* runCommand(
-    ChildProcess.make({
-      cwd: stageAppDir,
-      ...commandOutputOptions(options.verbose),
-      // Windows needs shell mode to resolve .cmd shims (e.g. bun.cmd).
-      shell: process.platform === "win32",
-    })`bun install --production --omit optional`,
-  );
-
   const buildEnv: NodeJS.ProcessEnv = {
     ...process.env,
   };
@@ -854,6 +882,22 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       delete buildEnv[key];
     }
   }
+  const python = yield* resolvePythonForNodeGyp();
+  if (python) {
+    buildEnv.PYTHON = python;
+    buildEnv.npm_config_python = python;
+  }
+
+  yield* Effect.log("[desktop-artifact] Installing staged production dependencies...");
+  yield* runCommand(
+    ChildProcess.make({
+      cwd: stageAppDir,
+      env: buildEnv,
+      ...commandOutputOptions(options.verbose),
+      // Windows needs shell mode to resolve .cmd shims (e.g. bun.cmd).
+      shell: process.platform === "win32",
+    })`bun install --production --omit optional`,
+  );
   if (!options.signed) {
     buildEnv.CSC_IDENTITY_AUTO_DISCOVERY = "false";
     delete buildEnv.CSC_LINK;
@@ -864,7 +908,6 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   }
 
   if (process.platform === "win32") {
-    const python = yield* resolvePythonForNodeGyp();
     if (python) {
       buildEnv.PYTHON = python;
       buildEnv.npm_config_python = python;
