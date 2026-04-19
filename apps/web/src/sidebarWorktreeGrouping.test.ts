@@ -56,7 +56,7 @@ describe("buildSidebarWorktreeGroups", () => {
 
     expect(groups).toHaveLength(1);
     expect(groups[0]?.label).toBe("Root");
-    expect(groups[0]?.threads.map((thread) => thread.id).sort()).toEqual([
+    expect(groups[0]?.threads.map((thread) => thread.id).toSorted()).toEqual([
       ThreadId.make("thread-1"),
       ThreadId.make("thread-2"),
     ]);
@@ -90,10 +90,62 @@ describe("buildSidebarWorktreeGroups", () => {
     });
 
     expect(groups.map((group) => group.label)).toEqual(["Root", "feature-a"]);
-    expect(groups[1]?.threads.map((thread) => thread.id).sort()).toEqual([
+    expect(groups[1]?.threads.map((thread) => thread.id).toSorted()).toEqual([
       ThreadId.make("thread-2"),
       ThreadId.make("thread-3"),
     ]);
+  });
+
+  it("prefers the shared branch name for worktree group labels", () => {
+    const groups = buildSidebarWorktreeGroups({
+      threads: [
+        makeSidebarThreadSummary({
+          id: ThreadId.make("thread-1"),
+          environmentId,
+          projectId,
+          title: "WT A",
+          branch: "deb-desktop-icon",
+          worktreePath: "/repo/.worktrees/t3code-123",
+        }),
+        makeSidebarThreadSummary({
+          id: ThreadId.make("thread-2"),
+          environmentId,
+          projectId,
+          title: "WT B",
+          branch: "deb-desktop-icon",
+          worktreePath: "/repo/.worktrees/t3code-123",
+        }),
+      ],
+      threadSortOrder: "created_at",
+    });
+
+    expect(groups.map((group) => group.label)).toEqual(["deb-desktop-icon"]);
+  });
+
+  it("falls back to the worktree folder name when grouped threads disagree on branch", () => {
+    const groups = buildSidebarWorktreeGroups({
+      threads: [
+        makeSidebarThreadSummary({
+          id: ThreadId.make("thread-1"),
+          environmentId,
+          projectId,
+          title: "WT A",
+          branch: "feature-a",
+          worktreePath: "/repo/.worktrees/t3code-123",
+        }),
+        makeSidebarThreadSummary({
+          id: ThreadId.make("thread-2"),
+          environmentId,
+          projectId,
+          title: "WT B",
+          branch: "feature-b",
+          worktreePath: "/repo/.worktrees/t3code-123",
+        }),
+      ],
+      threadSortOrder: "created_at",
+    });
+
+    expect(groups.map((group) => group.label)).toEqual(["t3code-123"]);
   });
 
   it("sorts worktree groups alphabetically by display label", () => {

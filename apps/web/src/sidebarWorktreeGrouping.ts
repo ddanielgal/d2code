@@ -21,6 +21,10 @@ export function normalizeSidebarWorktreePath(value: string | null): string | nul
   return trimmed ? trimmed : null;
 }
 
+function isNonEmptyString(value: string | undefined): value is string {
+  return Boolean(value);
+}
+
 export function sidebarWorktreeGroupKey(projectKey: string, worktreePath: string | null): string {
   const normalizedPath = normalizeSidebarWorktreePath(worktreePath);
   return normalizedPath ? `${projectKey}::worktree:${normalizedPath}` : `${projectKey}::root`;
@@ -47,10 +51,17 @@ export function buildSidebarWorktreeGroups(input: {
     .map(([key, threads]) => {
       const worktreePath = normalizeSidebarWorktreePath(threads[0]?.worktreePath ?? null);
       const sortedThreads = sortThreads([...threads], input.threadSortOrder);
+      const branchLabels = [
+        ...new Set(threads.map((thread) => thread.branch?.trim()).filter(isNonEmptyString)),
+      ];
+      const sharedBranch = branchLabels.length === 1 ? (branchLabels[0] ?? null) : null;
+      const label = worktreePath
+        ? (sharedBranch ?? formatWorktreePathForDisplay(worktreePath))
+        : "Root";
       return {
         key,
         kind: worktreePath ? "worktree" : "root",
-        label: worktreePath ? formatWorktreePathForDisplay(worktreePath) : "Root",
+        label,
         worktreePath,
         threadCount: sortedThreads.length,
         threads: sortedThreads,
