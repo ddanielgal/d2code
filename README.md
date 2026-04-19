@@ -1,75 +1,39 @@
-# T3 Code
+# D2 Code
 
-T3 Code is a minimal web GUI for coding agents (currently Codex and Claude, more coming soon).
+D2 Code is a customized T3 Code build: a minimal web GUI for coding agents.
+
+It is optimized for Kubuntu desktop (Ubuntu + KDE).
+
+It is optimized for the OpenCode provider.
 
 ## Installation
 
-> [!WARNING]
-> T3 Code currently supports Codex and Claude.
-> Install and authenticate at least one provider before use:
->
-> - Codex: install [Codex CLI](https://github.com/openai/codex) and run `codex login`
-> - Claude: install Claude Code and run `claude auth login`
+Make sure `opencode` is available on your PATH.
 
-### Run without installing
+Build the deb package:
 
 ```bash
-npx t3
+bun run dist:desktop:linux:deb
 ```
 
-### Desktop app
-
-Install the latest version of the desktop app from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), or from your favorite package registry:
-
-#### Windows (`winget`)
+Install it:
 
 ```bash
-winget install T3Tools.T3Code
+sudo dpkg -i ./release/D2-Code-*.deb
 ```
 
-#### macOS (Homebrew)
+## Development
 
 ```bash
-brew install --cask t3-code
+bun run dev --no-browser
 ```
 
-#### Ubuntu / Kubuntu / Debian
+## Notes
 
-Download the `.deb` from [GitHub Releases](https://github.com/pingdotgg/t3code/releases) and install it with:
+This is a proof of concept. Expect bugs.
+
+If native `node-gyp` steps fail because of a Homebrew Python setup, run commands with:
 
 ```bash
-sudo apt install ./T3-Code-*.deb
+PYTHON=/usr/bin/python3 <command>
 ```
-
-#### Arch Linux (AUR)
-
-```bash
-yay -S t3code-bin
-```
-
-Linux auto-updates currently require the AppImage build. The `.deb` is the simplest native install path for Ubuntu-family desktops.
-
-## Some notes
-
-We are very very early in this project. Expect bugs.
-
-We are not accepting contributions yet.
-
-Observability guide: [docs/observability.md](./docs/observability.md)
-
-## If you REALLY want to contribute still.... read this first
-
-Before local development, prepare the environment and install dependencies:
-
-```bash
-# Optional: only needed if you use mise for dev tool management.
-mise install
-bun install .
-
-# Build the project. If native node-gyp issues show up, skip them for now.
-bun run build
-```
-
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or PR.
-
-Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).
