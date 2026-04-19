@@ -3611,7 +3611,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       const createWorktree = vi.fn((_: Parameters<GitCoreShape["createWorktree"]>[0]) =>
         Effect.succeed({
           worktree: {
-              branch: "d2code/bootstrap-branch",
+            branch: "d2code/bootstrap-branch",
             path: "/tmp/bootstrap-worktree",
           },
         }),
